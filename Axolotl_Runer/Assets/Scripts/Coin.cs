@@ -18,8 +18,8 @@ public class Coin : MonoBehaviour
                 scoreManager.AddPoints(scoreValue);
             }
 
-            // Destruimos la moneda
-            Destroy(gameObject);
+            // Ocultamos la moneda
+            gameObject.SetActive(false);
         }
     }
 }
