@@ -27,7 +27,7 @@ public class PowerUp : MonoBehaviour
             }
 
             // Destruimos el Power-Up tras ser recogido
-            Destroy(gameObject);
+            gameObject.SetActive(false);
         }
     }
 }

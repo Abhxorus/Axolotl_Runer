@@ -1,54 +1,59 @@
 using System.Collections;
 using UnityEngine;
-using UnityEngine.InputSystem;
+
+public enum ModoMovimiento { Libre, Carriles }
 
 [RequireComponent(typeof(Rigidbody))]
 public class PlayerMovement : MonoBehaviour
 {
     [Header("Ajustes de Movimiento")]
+    public ModoMovimiento tipoMovimiento = ModoMovimiento.Carriles;
     public float lateralSpeed = 5.0f;
     public float lateralLimit = 5.0f;
+    public float laneChangeSpeed = 15.0f;
+    private int currentLane = 0;
 
     [Header("Ajustes de Salto y Rodado")]
     public float jumpForce = 7.0f;
     public float fastFallForce = 15.0f;
     public float rollDuration = 0.8f;
-    public float rolledHeight = 0.5f; // Qué tan bajito se hace el ajolote al rodar
+    public float rolledHeight = 0.5f;
+
+    [Header("Ajustes de Ataque")]
+    public float bounceForce = 8.0f;
+    public float attackRange = 1.0f;
+    public float attackRadius = 1.5f;
+    public LayerMask hittableLayer;
 
     [Header("Ajustes de Suelo y Agua")]
     public LayerMask groundLayer;
     public float waterLevel = -2.0f;
 
+    [HideInInspector] public bool isDead = false;
+
     private Rigidbody rb;
     private CapsuleCollider playerCollider;
-    private bool isDead = false;
     private bool isGrounded = false;
 
-    // Variables de estado original del collider
     private float originalHeight;
     private Vector3 originalCenter;
     private bool isRolling = false;
     private float rollTimer = 0f;
 
-    // Variables de lectura de inputs
     private float inputX = 0f;
     private bool jumpPressed = false;
     private bool rollPressed = false;
+    private bool bouncePending = false;
 
     void Start()
     {
         rb = GetComponent<Rigidbody>();
         playerCollider = GetComponent<CapsuleCollider>();
 
-        // Guardamos las proporciones originales del personaje
         if (playerCollider != null)
         {
             originalHeight = playerCollider.height;
             originalCenter = playerCollider.center;
-        }
-        else
-        {
-            Debug.LogWarning("¡Falta un CapsuleCollider en el jugador para la mecánica de rodar!");
         }
     }
 
@@ -56,31 +61,10 @@ public class PlayerMovement : MonoBehaviour
     {
         if (isDead) return;
 
-        if (Keyboard.current != null)
-        {
-            inputX = 0f;
-            if (Keyboard.current.aKey.isPressed) inputX = -1f;
-            else if (Keyboard.current.dKey.isPressed) inputX = 1f;
-
-            if (Keyboard.current.spaceKey.wasPressedThisFrame)
-            {
-                jumpPressed = true;
-            }
-
-            if (Keyboard.current.sKey.wasPressedThisFrame || Keyboard.current.downArrowKey.wasPressedThisFrame)
-            {
-                rollPressed = true;
-            }
-        }
-
-        // Temporizador para dejar de rodar
         if (isRolling)
         {
             rollTimer -= Time.deltaTime;
-            if (rollTimer <= 0)
-            {
-                StopRoll();
-            }
+            if (rollTimer <= 0) StopRoll();
         }
 
         CheckWater();
@@ -93,15 +77,72 @@ public class PlayerMovement : MonoBehaviour
         HandleLateralMovement();
         HandleJump();
         HandleRollAndFastFall();
+        HandleBounce();
     }
+
+    // --- MÉTODOS PÚBLICOS PARA EL INPUT ---
+
+    public void SetInputX(float x)
+    {
+        inputX = x;
+    }
+
+    public void ChangeLane(int direction)
+    {
+        currentLane += direction;
+        currentLane = Mathf.Clamp(currentLane, -1, 1);
+    }
+
+    public void TriggerJump()
+    {
+        jumpPressed = true;
+    }
+
+    public void TriggerRoll()
+    {
+        rollPressed = true;
+    }
+
+    public void PerformAttack()
+    {
+        Vector3 attackPos = transform.position + (Vector3.forward * attackRange);
+        Collider[] hitObjects = Physics.OverlapSphere(attackPos, attackRadius, hittableLayer);
+
+        bool hitSuccess = false;
+        foreach (Collider obj in hitObjects)
+        {
+            hitSuccess = true;
+            obj.gameObject.SetActive(false);
+        }
+
+        if (hitSuccess && !isGrounded) bouncePending = true;
+    }
+
+    public void ForceBounce(float customForce)
+    {
+        rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
+        rb.AddForce(Vector3.up * customForce, ForceMode.Impulse);
+        isGrounded = false;
+    }
+
+    // --- FÍSICAS INTERNAS ---
 
     private void HandleLateralMovement()
     {
-        rb.linearVelocity = new Vector3(inputX * lateralSpeed, rb.linearVelocity.y, 0f);
-
-        Vector3 clampedPos = rb.position;
-        clampedPos.x = Mathf.Clamp(clampedPos.x, -lateralLimit, lateralLimit);
-        rb.position = clampedPos;
+        if (tipoMovimiento == ModoMovimiento.Libre)
+        {
+            rb.linearVelocity = new Vector3(inputX * lateralSpeed, rb.linearVelocity.y, 0f);
+            Vector3 clampedPos = rb.position;
+            clampedPos.x = Mathf.Clamp(clampedPos.x, -lateralLimit, lateralLimit);
+            rb.position = clampedPos;
+        }
+        else
+        {
+            float targetX = currentLane * lateralLimit;
+            float newX = Mathf.MoveTowards(rb.position.x, targetX, laneChangeSpeed * Time.fixedDeltaTime);
+            rb.position = new Vector3(newX, rb.position.y, rb.position.z);
+            rb.linearVelocity = new Vector3(0f, rb.linearVelocity.y, rb.linearVelocity.z);
+        }
     }
 
     private void HandleJump()
@@ -109,8 +150,6 @@ public class PlayerMovement : MonoBehaviour
         if (jumpPressed)
         {
             jumpPressed = false;
-
-            // Si está rodando, no puede saltar (opcional, puedes quitar la condición de !isRolling)
             if (isGrounded && !isRolling)
             {
                 rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
@@ -125,16 +164,13 @@ public class PlayerMovement : MonoBehaviour
         if (rollPressed)
         {
             rollPressed = false;
-
             if (!isGrounded)
             {
-                // 1. Caída rápida si está en el aire
-                rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z); // Opcional: frena el salto seco
+                rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
                 rb.AddForce(Vector3.down * fastFallForce, ForceMode.Impulse);
             }
             else if (isGrounded && !isRolling)
             {
-                // 2. Rodar si está en el suelo
                 StartRoll();
             }
         }
@@ -144,11 +180,9 @@ public class PlayerMovement : MonoBehaviour
     {
         isRolling = true;
         rollTimer = rollDuration;
-
         if (playerCollider != null)
         {
             playerCollider.height = rolledHeight;
-            // Ajustamos el centro hacia abajo para que los pies sigan tocando el suelo
             playerCollider.center = new Vector3(originalCenter.x, rolledHeight / 2f, originalCenter.z);
         }
     }
@@ -156,7 +190,6 @@ public class PlayerMovement : MonoBehaviour
     private void StopRoll()
     {
         isRolling = false;
-
         if (playerCollider != null)
         {
             playerCollider.height = originalHeight;
@@ -164,20 +197,24 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
+    private void HandleBounce()
+    {
+        if (bouncePending)
+        {
+            bouncePending = false;
+            rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
+            rb.AddForce(Vector3.up * bounceForce, ForceMode.Impulse);
+        }
+    }
+
     private void OnCollisionStay(Collision collision)
     {
-        if ((groundLayer.value & (1 << collision.gameObject.layer)) > 0)
-        {
-            isGrounded = true;
-        }
+        if ((groundLayer.value & (1 << collision.gameObject.layer)) > 0) isGrounded = true;
     }
 
     private void OnCollisionExit(Collision collision)
     {
-        if ((groundLayer.value & (1 << collision.gameObject.layer)) > 0)
-        {
-            isGrounded = false;
-        }
+        if ((groundLayer.value & (1 << collision.gameObject.layer)) > 0) isGrounded = false;
     }
 
     private void CheckWater()
@@ -199,9 +236,14 @@ public class PlayerMovement : MonoBehaviour
     {
         float originalSpeed = lateralSpeed;
         lateralSpeed *= 2f;
-
         yield return new WaitForSeconds(5f);
-
         lateralSpeed = originalSpeed;
+    }
+
+    private void OnDrawGizmosSelected()
+    {
+        Gizmos.color = Color.red;
+        Vector3 attackPos = transform.position + (Vector3.forward * attackRange);
+        Gizmos.DrawWireSphere(attackPos, attackRadius);
     }
 }
