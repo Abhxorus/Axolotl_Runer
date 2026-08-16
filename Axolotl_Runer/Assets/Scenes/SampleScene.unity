@@ -2520,6 +2520,8 @@ MonoBehaviour:
   - {fileID: 899318223}
   - {fileID: 698312172}
   - {fileID: 1655519948}
+  delayBeforeMenu: 2.5
+  menuSceneName: Menu
 --- !u!54 &755295899
 Rigidbody:
   m_ObjectHideFlags: 0

@@ -1,5 +1,7 @@
+using System.Collections; // Necesario para las corrutinas
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.SceneManagement; // Necesario para cambiar de escena
 
 public class PlayerHealth : MonoBehaviour
 {
@@ -9,6 +11,12 @@ public class PlayerHealth : MonoBehaviour
 
     [Header("Interfaz (UI)")]
     public Image[] fullHearts;
+
+    [Header("Ajustes de Game Over")]
+    [Tooltip("Tiempo de espera antes de volver al menú")]
+    public float delayBeforeMenu = 2.5f;
+    [Tooltip("Nombre exacto de tu escena de menú principal")]
+    public string menuSceneName = "MenuScene";
 
     void Start()
     {
@@ -38,7 +46,6 @@ public class PlayerHealth : MonoBehaviour
     {
         currentLives += healAmount;
 
-        // Evitamos tener más vidas que el máximo permitido
         if (currentLives > maxLives)
         {
             currentLives = maxLives;
@@ -50,11 +57,8 @@ public class PlayerHealth : MonoBehaviour
 
     private void UpdateHeartsUI()
     {
-        // Recorremos la lista de corazones llenos
         for (int i = 0; i < fullHearts.Length; i++)
         {
-            // Si el índice es menor a las vidas, encendemos la imagen.
-            // Si es mayor o igual, la apagamos revelando el fondo oscuro.
             if (i < currentLives)
             {
                 fullHearts[i].enabled = true;
@@ -68,10 +72,15 @@ public class PlayerHealth : MonoBehaviour
 
     private void Die()
     {
-        // Aquí conectaremos la pantalla de Game Over más adelante
+        // En lugar de ejecutar todo de golpe, iniciamos la corrutina de Game Over
+        StartCoroutine(GameOverSequence());
+    }
+
+    private IEnumerator GameOverSequence()
+    {
         Debug.Log("¡El ajolote se ha quedado sin vidas! Fin del juego.");
 
-        // Usamos la nueva sintaxis optimizada de Unity
+        // 1. Detener todo el movimiento (como lo tenías antes)
         SegmentGenerator generator = FindAnyObjectByType<SegmentGenerator>();
         if (generator != null)
         {
@@ -84,7 +93,25 @@ public class PlayerHealth : MonoBehaviour
             streamer.isGameOver = true;
         }
 
-        // Opcional: Detener también el script de PlayerMovement
-        GetComponent<PlayerMovement>().enabled = false;
+        PlayerMovement movement = GetComponent<PlayerMovement>();
+        if (movement != null)
+        {
+            movement.enabled = false;
+        }
+
+        // 2. Registrar el progreso
+        ScoreManager scoreManager = FindAnyObjectByType<ScoreManager>();
+        if (scoreManager != null && DataManager.Instance != null)
+        {
+            // Sacamos el puntaje del ScoreManager y lo guardamos en el Singleton
+            DataManager.Instance.SaveScore(scoreManager.currentScore);
+            Debug.Log("Puntaje guardado: " + scoreManager.currentScore);
+        }
+
+        // 3. Esperar el tiempo especificado (x tiempo)
+        yield return new WaitForSeconds(delayBeforeMenu);
+
+        // 4. Volver al menú principal
+        SceneManager.LoadScene(menuSceneName);
     }
 }

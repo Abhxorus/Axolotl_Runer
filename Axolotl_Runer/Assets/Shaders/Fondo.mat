@@ -53,7 +53,7 @@ Material:
     - _QueueControl: 0
     - _QueueOffset: 0
     m_Colors:
-    - _ColorFondo: {r: 1, g: 1, b: 1, a: 1}
+    - _ColorFondo: {r: 0.9622642, g: 0.6663225, b: 0.8872309, a: 1}
     - _ColorGrandes: {r: 0.7584905, g: 0.061537847, b: 0.061537847, a: 1}
     - _ColorPequenas: {r: 0, g: 0.6981132, b: 0.6695604, a: 1}
     - _TilingGrandes: {r: 0, g: 0, b: 0, a: 0}
