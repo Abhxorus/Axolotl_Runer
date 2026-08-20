@@ -3,26 +3,40 @@ using UnityEngine;
 
 public class LevelStreamer : MonoBehaviour
 {
-    [Header("Configuración del Pool")]
-    [Tooltip("El segmento que siempre aparecerá al inicio (ej. los nenúfares fijos)")]
-    public GameObject startingSegmentPrefab; // <-- NUEVO
-    public GameObject[] segmentPrefabs;
+    public enum TipoBioma { Agua, Tierra }
+
+    [Header("Máquina de Biomas")]
+    public TipoBioma biomaActual = TipoBioma.Agua;
+    [Tooltip("Mínimo de segmentos que durará un bioma antes de cambiar")]
+    public int minSegmentos = 5;
+    [Tooltip("Máximo de segmentos que durará un bioma")]
+    public int maxSegmentos = 10;
+    private int segmentosRestantes;
+
+    [Header("Prefabs de Agua")]
+    public GameObject[] segmentosAgua;
+    public GameObject transicionAguaATierra;
+
+    [Header("Prefabs de Tierra")]
+    public GameObject[] segmentosTierra;
+    public GameObject transicionTierraAAgua;
+
+    [Header("Configuración General")]
+    public GameObject startingSegmentPrefab;
     public int poolSize = 6;
     public float segmentLength = 20f;
-
-    [Tooltip("Punto en Z donde el segmento desaparece por detrás de la cámara")]
     public float despawnZ = -30f;
-
-    [Header("Velocidad del Río")]
     public float scrollSpeed = 7.0f;
-
     public bool isGameOver = false;
 
     private Queue<GameObject> activeSegments = new Queue<GameObject>();
-    private GameObject instantiatedStartSegment; // <-- NUEVO: Para identificarlo
+    private GameObject instantiatedStartSegment;
 
     void Start()
     {
+        // Definimos cuántos bloques durará el primer bioma
+        segmentosRestantes = Random.Range(minSegmentos, maxSegmentos);
+
         // 1. Instanciamos el segmento de inicio obligatoriamente en la posición Z = 0
         if (startingSegmentPrefab != null)
         {
@@ -31,7 +45,7 @@ public class LevelStreamer : MonoBehaviour
             activeSegments.Enqueue(instantiatedStartSegment);
         }
 
-        // 2. Generamos los segmentos restantes aleatoriamente (empezando desde el índice 1)
+        // 2. Generamos el resto de la piscina (empezando con el bioma actual)
         for (int i = 1; i < poolSize; i++)
         {
             SpawnInitialSegment(i * segmentLength);
@@ -57,27 +71,49 @@ public class LevelStreamer : MonoBehaviour
 
     private void SpawnInitialSegment(float zPosition)
     {
-        int randomIndex = Random.Range(0, segmentPrefabs.Length);
-        GameObject go = Instantiate(segmentPrefabs[randomIndex], new Vector3(0, 0, zPosition), Quaternion.identity);
+        // Al iniciar la partida, llenamos la cola con segmentos de agua por defecto
+        int randomIndex = Random.Range(0, segmentosAgua.Length);
+        GameObject go = Instantiate(segmentosAgua[randomIndex], new Vector3(0, 0, zPosition), Quaternion.identity);
         go.transform.SetParent(this.transform);
         activeSegments.Enqueue(go);
     }
 
+    private GameObject ObtenerSiguientePrefab()
+    {
+        segmentosRestantes--;
+
+        // Si el contador llega a cero, toca cambiar de bioma usando las rampas
+        if (segmentosRestantes <= 0)
+        {
+            if (biomaActual == TipoBioma.Agua)
+            {
+                biomaActual = TipoBioma.Tierra;
+                segmentosRestantes = Random.Range(minSegmentos, maxSegmentos);
+                return transicionAguaATierra;
+            }
+            else
+            {
+                biomaActual = TipoBioma.Agua;
+                segmentosRestantes = Random.Range(minSegmentos, maxSegmentos);
+                return transicionTierraAAgua;
+            }
+        }
+
+        // Si no hay transición, entregamos un bloque normal del bioma actual
+        if (biomaActual == TipoBioma.Agua)
+        {
+            return segmentosAgua[Random.Range(0, segmentosAgua.Length)];
+        }
+        else
+        {
+            return segmentosTierra[Random.Range(0, segmentosTierra.Length)];
+        }
+    }
+
     private void RecycleSegment()
     {
+        // Sacamos el segmento viejo de la cola
         GameObject recycledSegment = activeSegments.Dequeue();
-
-        // --- NUEVO: Si es el segmento de inicio, lo cambiamos por uno normal ---
-        if (recycledSegment == instantiatedStartSegment)
-        {
-            int randomIndex = Random.Range(0, segmentPrefabs.Length);
-            GameObject newSegment = Instantiate(segmentPrefabs[randomIndex], Vector3.zero, Quaternion.identity);
-            newSegment.transform.SetParent(this.transform);
-
-            Destroy(recycledSegment); // Lo destruimos para que no vuelva a aparecer
-            recycledSegment = newSegment; // El nuevo toma su lugar en el ciclo
-        }
-        // ------------------------------------------------------------------------
 
         // Encontramos la posición Z del segmento que está más lejos hacia adelante
         float maxZ = -9999f;
@@ -89,16 +125,20 @@ public class LevelStreamer : MonoBehaviour
             }
         }
 
-        // Colocamos el segmento reciclado justo detrás del último segmento
-        recycledSegment.transform.position = new Vector3(0, 0, maxZ + segmentLength);
+        // Calculamos dónde debe aparecer el nuevo bloque
+        Vector3 nuevaPosicion = new Vector3(0, 0, maxZ + segmentLength);
 
-        // Reactivamos todas las monedas o items
-        Transform[] todosLosHijos = recycledSegment.GetComponentsInChildren<Transform>(true);
-        foreach (Transform hijo in todosLosHijos)
-        {
-            hijo.gameObject.SetActive(true);
-        }
+        // Llamamos a nuestra lógica para saber qué bloque toca (Tierra, Agua o Transición)
+        GameObject prefabSiguiente = ObtenerSiguientePrefab();
 
-        activeSegments.Enqueue(recycledSegment);
+        // Instanciamos el bloque correcto en la posición calculada
+        GameObject newSegment = Instantiate(prefabSiguiente, nuevaPosicion, Quaternion.identity);
+        newSegment.transform.SetParent(this.transform);
+
+        // Destruimos el bloque viejo que ya pasó por la cámara
+        Destroy(recycledSegment);
+
+        // Agregamos el nuevo bloque a la fila para que se empiece a mover
+        activeSegments.Enqueue(newSegment);
     }
 }
