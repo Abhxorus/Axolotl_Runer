@@ -29,10 +29,23 @@ public class PlayerMovement : MonoBehaviour
     public LayerMask groundLayer;
     public float waterLevel = -2.0f;
 
+    [Header("Sonidos")]
+    public AudioClip sonidoSalto;
+    public AudioClip sonidoCaida;
+    public AudioClip sonidoRodar;
+    public AudioClip sonidoGolpe;
+    public AudioClip sonidoPogo;
+    public AudioClip sonidoPasos;
+    [Tooltip("Qué tan rápido suenan los pasos (en segundos)")]
+    public float tiempoEntrePasos = 0.3f;
+    private float pasoTimer = 0f;
+    private AudioSource fuentePasos;
+
     [HideInInspector] public bool isDead = false;
 
     private Rigidbody rb;
     private CapsuleCollider playerCollider;
+    private Animator anim;
     private bool isGrounded = false;
 
     private float originalHeight;
@@ -50,11 +63,16 @@ public class PlayerMovement : MonoBehaviour
         rb = GetComponent<Rigidbody>();
         playerCollider = GetComponent<CapsuleCollider>();
 
+        anim = GetComponentInChildren<Animator>();
+
         if (playerCollider != null)
         {
             originalHeight = playerCollider.height;
             originalCenter = playerCollider.center;
         }
+
+        fuentePasos = gameObject.AddComponent<AudioSource>();
+        fuentePasos.playOnAwake = false;
     }
 
     void Update()
@@ -68,6 +86,39 @@ public class PlayerMovement : MonoBehaviour
         }
 
         CheckWater();
+
+        if (isGrounded && !isRolling && !jumpPressed && !bouncePending)
+        {
+            pasoTimer -= Time.deltaTime;
+
+            if (pasoTimer <= 0f)
+            {
+                if (fuentePasos != null && sonidoPasos != null)
+                {
+                    // Usamos la fuente local en lugar del AudioManager
+                    fuentePasos.PlayOneShot(sonidoPasos);
+                }
+                pasoTimer = tiempoEntrePasos;
+            }
+        }
+        else
+        {
+            // Resetea el timer para que suene justo al tocar el suelo
+            pasoTimer = 0f;
+
+            // ¡ESTO HACE QUE PARE DE GOLPE!
+            if (fuentePasos != null && fuentePasos.isPlaying)
+            {
+                fuentePasos.Stop();
+            }
+        }
+        if (anim != null)
+        {
+            anim.SetBool("isGrounded", isGrounded);
+            anim.SetBool("isRolling", isRolling);
+            // Pasamos la velocidad vertical para saber si sube o cae
+            anim.SetFloat("yVelocity", rb.linearVelocity.y);
+        }
     }
 
     void FixedUpdate()
@@ -105,6 +156,10 @@ public class PlayerMovement : MonoBehaviour
 
     public void PerformAttack()
     {
+        if (AudioManager.Instance != null) AudioManager.Instance.PlaySFX(sonidoGolpe);
+
+        if (anim != null) anim.SetTrigger("Attack");
+
         Vector3 attackPos = transform.position + (Vector3.forward * attackRange);
         Collider[] hitObjects = Physics.OverlapSphere(attackPos, attackRadius, hittableLayer);
 
@@ -123,6 +178,8 @@ public class PlayerMovement : MonoBehaviour
         rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
         rb.AddForce(Vector3.up * customForce, ForceMode.Impulse);
         isGrounded = false;
+
+        if (anim != null) anim.SetTrigger("Jump");
     }
 
     // --- FÍSICAS INTERNAS ---
@@ -154,6 +211,8 @@ public class PlayerMovement : MonoBehaviour
             {
                 rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
                 rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
+                if (anim != null) anim.SetTrigger("Jump");
+                AudioManager.Instance.PlaySFX(sonidoSalto);
                 isGrounded = false;
             }
         }
@@ -168,6 +227,8 @@ public class PlayerMovement : MonoBehaviour
             {
                 rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
                 rb.AddForce(Vector3.down * fastFallForce, ForceMode.Impulse);
+
+                if (AudioManager.Instance != null) AudioManager.Instance.PlaySFX(sonidoCaida);
             }
             else if (isGrounded && !isRolling)
             {
@@ -185,6 +246,7 @@ public class PlayerMovement : MonoBehaviour
             playerCollider.height = rolledHeight;
             playerCollider.center = new Vector3(originalCenter.x, rolledHeight / 2f, originalCenter.z);
         }
+        if (AudioManager.Instance != null) AudioManager.Instance.PlaySFX(sonidoRodar);
     }
 
     private void StopRoll()
@@ -204,6 +266,8 @@ public class PlayerMovement : MonoBehaviour
             bouncePending = false;
             rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
             rb.AddForce(Vector3.up * bounceForce, ForceMode.Impulse);
+            //if (anim != null) anim.SetTrigger("Jump");
+            if (AudioManager.Instance != null) AudioManager.Instance.PlaySFX(sonidoPogo);
         }
     }
 

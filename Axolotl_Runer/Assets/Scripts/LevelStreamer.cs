@@ -50,6 +50,8 @@ public class LevelStreamer : MonoBehaviour
         {
             SpawnInitialSegment(i * segmentLength);
         }
+
+        AudioManager.Instance.IniciarPlaylist();
     }
 
     void Update()

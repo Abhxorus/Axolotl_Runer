@@ -18,20 +18,33 @@ public class PlayerHealth : MonoBehaviour
     [Tooltip("Nombre exacto de tu escena de menú principal")]
     public string menuSceneName = "MenuScene";
 
+    [Header("Sonidos")]
+    public AudioClip sonidoDano;
+    public AudioClip sonidoGameOver;
+
+    private Animator anim;
+
     void Start()
     {
         currentLives = maxLives;
         UpdateHeartsUI();
+
+        anim = GetComponentInChildren<Animator>();
     }
 
     public void TakeDamage(int damage)
     {
         currentLives -= damage;
-        Debug.Log("¡Daño recibido! Vidas restantes: " + currentLives);
+        Debug.Log("¡Dano recibido! Vidas restantes: " + currentLives);
 
         if (currentLives < 0)
         {
             currentLives = 0;
+        }
+
+        if (currentLives > 0 && AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlaySFX(sonidoDano);
         }
 
         UpdateHeartsUI();
@@ -85,6 +98,13 @@ public class PlayerHealth : MonoBehaviour
         if (generator != null)
         {
             generator.isGameOver = true;
+        }
+
+        if (anim != null) anim.SetTrigger("Die");
+
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlaySFX(sonidoGameOver);
         }
 
         LevelStreamer streamer = FindAnyObjectByType<LevelStreamer>();
