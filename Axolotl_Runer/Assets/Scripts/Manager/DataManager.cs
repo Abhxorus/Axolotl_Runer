@@ -9,26 +9,23 @@ public class DataManager : MonoBehaviour
     public int lastScore = 0;
     public int highScore = 0;
 
+    [Header("Control de Escenas")]
+    public bool showRecordsOnLoad = false;
+
     void Awake()
     {
-        // Configuramos el Singleton
         if (Instance == null)
         {
             Instance = this;
-            // Evita que este objeto se destruya al cambiar de escena
             DontDestroyOnLoad(gameObject);
+
+            // --- CORRECCIÓN: Cargamos el récord desde el disco duro de inmediato ---
+            highScore = PlayerPrefs.GetInt("HighScore", 0);
         }
         else
         {
-            // Si ya existe uno (por ejemplo, si vuelves a cargar el nivel), destruye la copia
             Destroy(gameObject);
         }
-    }
-
-    void Start()
-    {
-        // Opcional: Cargar el puntaje máximo guardado en el dispositivo
-        highScore = PlayerPrefs.GetInt("HighScore", 0);
     }
 
     public void SaveScore(int currentScore)

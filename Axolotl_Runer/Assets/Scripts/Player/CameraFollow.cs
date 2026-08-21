@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections;
 
 public class CameraFollow : MonoBehaviour
 {
@@ -17,6 +18,8 @@ public class CameraFollow : MonoBehaviour
     [Tooltip("0 = La cámara no se mueve a los lados. 1 = Sigue al jugador por completo. 0.3 = Se asoma un poco al carril")]
     [Range(0f, 1f)]
     public float multiplicadorX = 0.3f;
+
+    private Vector3 shakeOffset = Vector3.zero;
 
     void LateUpdate()
     {
@@ -45,5 +48,30 @@ public class CameraFollow : MonoBehaviour
 
         // 6. Aplicamos la posición combinada
         transform.position = new Vector3(newX, newY, newZ);
+    }
+
+    public void TriggerShake(float duration, float magnitude)
+    {
+        StartCoroutine(ShakeRoutine(duration, magnitude));
+    }
+
+    private IEnumerator ShakeRoutine(float duration, float magnitude)
+    {
+        float elapsed = 0.0f;
+
+        while (elapsed < duration)
+        {
+            // Generamos un desplazamiento aleatorio en los ejes X e Y
+            float x = Random.Range(-1f, 1f) * magnitude;
+            float y = Random.Range(-1f, 1f) * magnitude;
+
+            shakeOffset = new Vector3(x, y, 0f);
+
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        // Devolvemos la cámara a la normalidad exacta
+        shakeOffset = Vector3.zero;
     }
 }

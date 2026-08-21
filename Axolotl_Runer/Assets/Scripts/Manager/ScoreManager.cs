@@ -1,17 +1,37 @@
 using UnityEngine;
-using TMPro; // Obligatorio para poder usar TextMeshPro
+using TMPro;
 
 public class ScoreManager : MonoBehaviour
 {
+    [Header("Variables de Partida")]
     public int currentScore = 0;
+    public TextMeshProUGUI scoreText; // Texto en el HUD del juego
 
-    [Header("Interfaz de Usuario")]
-    public TextMeshProUGUI scoreText; // La referencia a tu texto en el Canvas
+    [Header("Variables de Menú de Récords")]
+    public TextMeshProUGUI lastScoreText; // Texto pintado en la pared 3D
+    public TextMeshProUGUI highScoreText; // Texto pintado en la pared 3D
 
     void Start()
     {
-        // Nos aseguramos de que el texto muestre cero desde el principio
-        ActualizarTexto();
+        // 1. Si estamos en partida, inicializa el texto en 0
+        if (scoreText != null)
+        {
+            ActualizarTexto();
+        }
+
+        // 2. Si estamos en el menú, consulta el DataManager de forma exclusiva
+        if (DataManager.Instance != null)
+        {
+            if (lastScoreText != null)
+            {
+                lastScoreText.text = "Puntaje: " + DataManager.Instance.lastScore.ToString();
+            }
+
+            if (highScoreText != null)
+            {
+                highScoreText.text = "Mejor Récord: " + DataManager.Instance.highScore.ToString();
+            }
+        }
     }
 
     public void AddPoints(int points)
@@ -20,17 +40,11 @@ public class ScoreManager : MonoBehaviour
         ActualizarTexto();
     }
 
-    // Separé esto en una función para mantenerlo ordenado
     private void ActualizarTexto()
     {
-        // Solo intentamos cambiar el texto si la variable no está vacía
         if (scoreText != null)
         {
             scoreText.text = "Puntos: " + currentScore.ToString();
-        }
-        else
-        {
-            Debug.LogWarning("¡Falta asignar el texto del Score en el Inspector!");
         }
     }
 }

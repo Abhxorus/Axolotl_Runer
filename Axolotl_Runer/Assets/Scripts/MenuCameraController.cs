@@ -7,7 +7,29 @@ public class MenuCameraController : MonoBehaviour
     [Tooltip("Qué tan rápido gira la cámara hacia la nueva pared")]
     public float rotationSpeed = 3.0f;
 
+    [Header("Ángulos de las Vistas")]
+    public float anguloMenuPrincipal = 0f;
+    public float anguloRecords = -90f;
+
     private bool isRotating = false;
+
+    void Start()
+    {
+        // Revisamos si venimos de un Game Over
+        if (DataManager.Instance != null && DataManager.Instance.showRecordsOnLoad)
+        {
+            // Rotación instantánea para cargar directamente viendo los récords
+            transform.rotation = Quaternion.Euler(0, anguloRecords, 0);
+
+            // Apagamos el interruptor para la próxima vez
+            DataManager.Instance.showRecordsOnLoad = false;
+        }
+        else
+        {
+            // Si abriste el juego normal, mira al menú
+            transform.rotation = Quaternion.Euler(0, anguloMenuPrincipal, 0);
+        }
+    }
 
     // Esta es la función pública que llamarán tus botones
     public void RotateToWall(float targetAngleY)

@@ -37,6 +37,13 @@ public class PlayerHealth : MonoBehaviour
         currentLives -= damage;
         Debug.Log("¡Dano recibido! Vidas restantes: " + currentLives);
 
+        CameraFollow camScript = Camera.main.GetComponent<CameraFollow>();
+        if (camScript != null)
+        {
+            // 0.2 segundos de duración y 0.3 de fuerza (puedes ajustar estos valores)
+            camScript.TriggerShake(0.2f, 0.3f);
+        }
+
         if (currentLives < 0)
         {
             currentLives = 0;
@@ -121,17 +128,20 @@ public class PlayerHealth : MonoBehaviour
 
         // 2. Registrar el progreso
         ScoreManager scoreManager = FindAnyObjectByType<ScoreManager>();
-        if (scoreManager != null && DataManager.Instance != null)
+        if (GameplayManager.Instance != null && DataManager.Instance != null)
         {
-            // Sacamos el puntaje del ScoreManager y lo guardamos en el Singleton
-            DataManager.Instance.SaveScore(scoreManager.currentScore);
-            Debug.Log("Puntaje guardado: " + scoreManager.currentScore);
+            DataManager.Instance.SaveScore(GameplayManager.Instance.currentScore);
         }
 
         // 3. Esperar el tiempo especificado (x tiempo)
         yield return new WaitForSeconds(delayBeforeMenu);
 
+        if (DataManager.Instance != null)
+        {
+            DataManager.Instance.showRecordsOnLoad = true;
+        }
+
         // 4. Volver al menú principal
-        SceneManager.LoadScene(menuSceneName);
+        TransitionManager.Instance.CargarEscena(menuSceneName);
     }
 }
